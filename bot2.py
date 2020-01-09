@@ -1,170 +1,212 @@
-import bot2texts as t
 import botSql
 import telebot
-import urllib.request
-import time
-from telebot import *
+from telebot import types
 import logging
+from gsheets import gsheets
+import requests
 import re
+import config
+import time
+import random
 
-# TODO #1:  block move save
-# TODO #2:  feedback save
-#----------------------------------------------------------------------
-token = t.token # this
-admin_password = 'AAGdxK5ZyTLi6x'
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+token = config.token  # this
+admin_password = 'QAZwsx123321'
+# ----------------------------------------------------------------------
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 bot = telebot.TeleBot(token)
 db = botSql.bot_sql()
+gs = gsheets()
 
-def user_banned_define(user_id,chat_id):
+
+def get_keyboard() -> list:
+    keyboard = []
+    for i in gs.get_list_worksheets():
+        keyboard.append(i.title)
+    return keyboard
+
+
+def user_banned_define(user_id, chat_id):
     if db.is_user_banned(user_id):
         bot.send_message(chat_id, "Вы заблокированы администротором!")
         return True
 
-def display_texts_content(off,id):
-    print("Value Off: ", off)
-    if off > len(t.texts) - 1:
-        return
-    str1 = ""
-    if isinstance(t.texts[off][0][0], tuple):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text=t.texts[off][1][0],
-                                              callback_data=str(off+1)))
-        bot.send_photo(id, photo=open(t.texts[off][0][0][0], 'rb'),reply_markup=markup)
-        return
-    for i in range(len(t.texts[off][0]) -1):
-        str1 += t.texts[off][0][i] + "\n\n"
-    if len(t.texts[off][0]) > 1:
-        bot.send_message(id, str1)
-    dispay_text_buttons(off,id)
 
-def dispay_text_buttons(off,id):
-    markup = types.InlineKeyboardMarkup()
-    if len(t.texts[off][1]) > 0:
-        for i in t.texts[off][1]:
-            if isinstance(i, tuple):
-                markup.add(types.InlineKeyboardButton(text=i[0],
-                                                      callback_data=str(i[1])))
-            else:
-                markup.add(types.InlineKeyboardButton(text=i,
-                                                      callback_data=str(off + 1)))
-
-        bot.send_message(id, t.texts[off][0][-1], reply_markup=markup, parse_mode='Markdown', disable_web_page_preview=True)
+def display_texts_content(id, off, block=None):
+    logging.debug('handler display_text_content, var off={}, block={}'.format(off, block))
+    if block is None:
+        text_list = gs.get_all_values_from_worksheet(db.get_user(id)[4])
     else:
-       m = bot.send_message(id, t.texts[off][0][-1])
-       bot.register_next_step_handler(m, lambda m : feedback_at_end_of_block(m,str(off+1)))
+        text_list = gs.get_all_values_from_worksheet(int(block))
+    logging.debug('len(text_list) = {}'.format(len(text_list)))
+    # print(len(text_list))
+    if off < len(text_list) - 1:
+        print(text_list[off][1])
+        if text_list[off][1] != "":  # button exists
+            logging.debug('Button exists!')
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton(text=text_list[off][1], callback_data=str(block) + ',' + str(off + 1)))
+            regex = r"(?:(http|https):\/\/)(.<b>?)\/(.+?)(?:\/|\?|\#|$|\n)\w<b>.(jpg|png|gif|bmp|jpeg)"
+            if re.search(regex, text_list[off][0]) is None:
+                bot.send_message(id, text_list[off][0], reply_markup=markup, parse_mode='Markdown',
+                                 disable_web_page_preview=True)
+            else:
+                with requests.session() as s:
+                    file = s.get(text_list[off][0]).content
+                    bot.send_photo(id, photo=file, reply_markup=markup)
+        else:
+            m = bot.send_message(id, text_list[off][0])
+            bot.register_next_step_handler(m, lambda m: answer_for_question(m, str(off + 1), str(block),
+                                                                            text_list[off][0]))
+    elif off == len(text_list) - 1:
+        m = bot.send_message(id, text_list[off][0])
+        bot.register_next_step_handler(m, lambda m: feedback_at_end_of_block(m, block))
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    if user_banned_define(message.from_user.id,message.chat.id):
+    if user_banned_define(message.from_user.id, message.chat.id):
         return
     register_user(message)
     m = bot.send_message(message.chat.id, "Для доступа введите пароль:")
-    bot.register_next_step_handler(m, acsess_handler)
+    bot.register_next_step_handler(m, access_handler)
 
-#    display_bottom_keyboard(message.chat.id)
-#    display_texts_content(0, message.chat.id)
 
 @bot.message_handler(commands=['admin'])
 def admin_message(message):
     if not db.is_user_already_in_table(message.from_user.id):
         register_user(message)
-    if user_banned_define(message.from_user.id,message.chat.id):
+    if user_banned_define(message.from_user.id, message.chat.id):
         return
     m = bot.send_message(message.chat.id, "Введите пароль администратора:")
     bot.register_next_step_handler(m, admin_password_handler)
 
+
 @bot.callback_query_handler(func=lambda call: True)
 def inline_button_pressed_handler(message):
-    if user_banned_define(message.from_user.id,message.from_user.id):
+    if user_banned_define(message.from_user.id, message.from_user.id):
         return
     chat_id = message.from_user.id
-    print(message.data)
     if message.data == "-1":
-        display_texts_content(0, chat_id)
+        display_texts_content(chat_id, 0)
         return
     if message.data == "-2":
         m = bot.send_message(chat_id, "Введите ID:")
         bot.register_next_step_handler(m, user_ban_handler)
         return
+    if message.data == "-3":
+        m = bot.send_message(chat_id, "Введите текст рассылки:")
+        bot.register_next_step_handler(m, send_message_all_users)
+        return
+    if message.data == "-4":
+        i = 0
+        pasw = []
+        while i < 50:
+            pasw.append(db.randomString())
+            db.add_password(pasw[i])
+            i += 1
+        str = ''
+        for p in pasw:
+            str += p + '\n'
+        with open('pasw.txt', 'w') as file:
+            file.write(str)
+        bot.send_document(config.admin, open('pasw.txt', 'rb'))
+        return
     if not db.is_user_already_in_table(message.from_user.id):
-            register_user(message)
-    if int(message.data) in t.keyboard_jump:                      # todo 1
-         iw = t.keyboard_jump.index(int(message.data))
-         if db.get_user(message.from_user.id)[4] < iw:
-               db.update_user_blocks(message.from_user.id, iw)
-    display_texts_content(int(message.data), chat_id)
+        register_user(message)
+    display_texts_content(chat_id, int(message.data.split(',')[1]), int(message.data.split(',')[0]))
 
 
 @bot.message_handler(content_types=['photo'])
 def feedback_photo(message):
-    if user_banned_define(message.from_user.id,message.chat.id):
+    if user_banned_define(message.from_user.id, message.chat.id):
         return
-    print( 'message.photo =', message.photo)
-    fileID = message.photo[-1].file_id
-    print('fileID =', fileID)
-    file = bot.get_file(fileID)
-    print ('file.file_path =', file.file_path)
-    downloaded_file = bot.download_file(file.file_path)
-    with open("photos"/fileID +".jpg", 'wb') as new_file:
-        new_file.write(downloaded_file)
+    file_id = message.photo[-1].file_id
+    bot.send_photo(config.admin, file_id)
+
 
 @bot.message_handler(content_types=["text"])
 def jump_bottom_keyboard_block(message):
-    if user_banned_define(message.from_user.id,message.chat.id):
+    if user_banned_define(message.from_user.id, message.chat.id):
         return
     text = message.text
-    if text in t.keyboard:
-        index = t.keyboard.index(text)
+    if text in get_keyboard():
+        index = get_keyboard().index(text)
+        # print(index)
         if not db.is_user_already_in_table(message.from_user.id):
             register_user(message)
         completed = db.get_user(message.from_user.id)[4]
-        print(completed,index)
+        print(completed, index)
+        logging.debug("Run jump_bottom_keyboard_block")
         if completed >= index:
-            display_texts_content(t.keyboard_jump[index], message.chat.id)
+            display_texts_content(message.chat.id, 0, index)
         else:
             bot.send_message(message.chat.id, "Вы пока не имеете доступ к данному блоку!")
 
+
 def display_bottom_keyboard(id):
     user_markup = types.ReplyKeyboardMarkup(row_width=5, resize_keyboard=True, one_time_keyboard=False)
-    user_markup.add(*[types.KeyboardButton(name) for name in t.keyboard])
-    m = bot.send_message(id, "❤️❤️❤️", reply_markup=user_markup)
-
-def feedback_at_end_of_block(message,off):
-    chat_id = message.chat.id
-    answer = message.text
-    _id = message.from_user.id
-    _f_name = message.from_user.first_name
-    _l_name = message.from_user.last_name
-    _username = message.from_user.username
-    if _f_name is None:
-        _f_name = ""
-    if _l_name is None:
-        _l_name = ""
-    if _username is None:
-       _username = ""
-    try:
+    user_markup.add(*[types.KeyboardButton(name) for name in get_keyboard()])
+    bot.send_message(id, "❤️❤️❤️", reply_markup=user_markup)
 
 
-        print(str( ("Отзыв от пльзователя " + _f_name + "  " + _l_name + "Ник: @" + _username).encode('utf-8') ))
-        email_test_send.smtp_send_email( str( ("Отзыв от пльзователя " + _f_name + "  " + _l_name + "Ник: @" + _username).encode('utf-8') ), answer)
+def feedback_at_end_of_block(message, block):
+    logging.debug('Feedback end of LAST block, len(gs.get_list_worksheets()={} End block: {}'.format(
+        len(gs.get_list_worksheets()), db.get_user(message.chat.id)[4]))
 
-    except Exception as e:
-        print('smtp',e)
-    display_texts_content(int(off), chat_id)
+    if block + 1 < len(gs.get_list_worksheets()):
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text='Перейти к следующему блоку',
+                                              callback_data=str(block + 1) + ',' + str(0)))
+        bot.send_message(message.chat.id, 'Спасибо за отзыв!', reply_markup=markup)
+        send_message_to_admin(message, f'Ответ на отзыв Блока № {block + 1}')
+    elif block + 1 == len(gs.get_list_worksheets()):
+        bot.send_message(message.chat.id, 'Спасибо за отзыв! Это был последний блок!')
+        send_message_to_admin(message, 'Ответ на отзыв Заключительного Блока')
+
+    if db.get_user(message.chat.id)[4] == block and db.get_user(message.chat.id)[4] < len(gs.get_list_worksheets()):
+        db.update_user_blocks(message.chat.id, db.get_user(message.chat.id)[4] + 1)
+
+
+def answer_for_question(message, off, block, text):
+    if message.content_type == 'photo':
+        logging.debug('Answer for question is type: photo')
+        file_id = message.photo[-1].file_id
+        bot.send_photo(config.admin, file_id, caption=f'Фото от @{message.from_user.username}')
+    else:
+        logging.debug('Answer for question is type: text.')
+        send_message_to_admin(message, text)
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(text='Следующее задание', callback_data=str(block) + ',' + str(off)))
+    bot.send_message(message.chat.id, 'Ответ принят!', reply_markup=markup)
+
+
+def send_message_to_admin(message, text, admin_id=config.admin):
+    msg = f'Сообщение от @{message.from_user.username} на вопрос <b>{text}</b>:\n\n'
+    bot.send_message(admin_id, text=msg + message.text, parse_mode='HTML')
+
+
+def send_message_all_users(message):
+    users_id_list = (users_id[0] for users_id in db.get_all_users())
+    for user_id in users_id_list:
+        bot.send_message(user_id, message.text, parse_mode='Markdown')
+        time.sleep(random.random())
+    bot.send_message(config.admin, 'Рассылка произведена!')
+
 
 def admin_password_handler(message):
     chat_id = message.chat.id
     answer = message.text
     markup = types.InlineKeyboardMarkup()
-    #markup.add(types.InlineKeyboardButton(text="Закрыть",
+    # markup.add(types.InlineKeyboardButton(text="Закрыть",
     #                                      callback_data="-1"))
     if answer == admin_password:
-        display_user_list(chat_id,markup)
+        display_user_list(chat_id, markup)
     else:
         bot.send_message(chat_id, "Пароль не верный", reply_markup=markup)
+
 
 def str_default(s):
     if s is None:
@@ -173,18 +215,26 @@ def str_default(s):
         return s
 
 
-def display_user_list(chat_id,markup):
+def display_user_list(chat_id, markup):
     a = "Список пользователей:\n"
     users = db.get_all_users()
+    print(users)
     counter = 1
     for user in users:
-        a += str(counter) + ".  *ID* = " + str(user[0]) + " , *Имя:* " + str_default(user[1]) + " *Фамилия:* " + str_default(user[
-            2]) + " *Имя пользователя:* " + str_default(user[3]) \
-             + " *Блоков пройдено:* " + str(user[4]) + " *Заблокирован:* " + ("Нет" if user[5] == 0 else "Да" )+ "\n\n"
+        a += str(counter) + ".  <b>ID</b> = " + str(user[0]) \
+             + " , <b>Имя:</b> " + str_default(user[1]) \
+             + " <b>Фамилия:</b> " + str_default(user[2]) \
+             + " <b>Имя пользователя:</b> " + str_default(user[3]) \
+             + " <b>Блоков пройдено:</b> " + str(user[4]) \
+             + " <b>Заблокирован:</b> " + ("Нет" if user[5] == 0 else "Да") + "\n\n"
         counter = counter + 1
     markup.add(types.InlineKeyboardButton(text="Заблокировать/разблокировать пользователя",
                                           callback_data="-2"))
-    bot.send_message(chat_id, a, reply_markup=markup, parse_mode='Markdown')
+    markup.add(types.InlineKeyboardButton(text="Сделать рассылку",
+                                          callback_data="-3"))
+    markup.add(types.InlineKeyboardButton(text="Сгенерировать пароли",
+                                          callback_data="-4"))
+    bot.send_message(chat_id, a, reply_markup=markup, parse_mode='HTML')
 
 
 def register_user(message):
@@ -197,15 +247,15 @@ def register_user(message):
     if _l_name is None:
         _l_name = ""
     if _username is None:
-       _username = ""
-    db.add_new_user(_id,_f_name , _l_name, '@' + _username, 0)
+        _username = ""
+    db.add_new_user(_id, _f_name, _l_name, '@' + _username, 0)
 
 
 def user_ban_handler(message):
     chat_id = message.chat.id
     answer = 0
     markup = types.InlineKeyboardMarkup()
-    #markup.add(types.InlineKeyboardButton(text="Закрыть",
+    # markup.add(types.InlineKeyboardButton(text="Закрыть",
     #                                      callback_data="-1"))
     try:
         answer = int(message.text)
@@ -216,38 +266,24 @@ def user_ban_handler(message):
     if db.is_user_already_in_table(answer):
         status = db.get_user(answer)[5]
         if status:
-            db.ban_user(answer,True)
+            db.ban_user(answer, True)
             bot.send_message(chat_id, "Пользователь разблокирован")
         else:
-            db.ban_user(answer,False)
+            db.ban_user(answer, False)
             bot.send_message(chat_id, "Пользователь заблокирован")
     else:
         bot.send_message(chat_id, "ID не найден")
     display_user_list(chat_id, markup)
 
-def acsess_handler(message):
+
+def access_handler(message):
     chat_id = message.chat.id
     answer = message.text
     if db.password_proc(answer):
         display_bottom_keyboard(message.chat.id)
-        display_texts_content(0, message.chat.id)
+        display_texts_content(message.chat.id, 0, 0)
     else:
         bot.send_message(chat_id, "Пароль не найден либо уже активирован!")
 
 
-
-
-
 bot.polling(none_stop=True)
-
-
-
-
-
-
-if not "HEROKU" in list(os.environ.keys()):
-
-    pass
-else:
-
-    pass

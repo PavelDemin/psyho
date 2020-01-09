@@ -1,6 +1,6 @@
 # This Python file uses the following encoding: utf-8
 
-token = '1003665340:AAGACF_p8Gt6j7gkZXhjebruIZKYbP5nJak'
+
 #token = '966962784:AAGdxK5ZyTLi6xZKZuKX2uWnRaEBFSXZYTo'
 keyboard = \
     [
@@ -782,4 +782,3 @@ texts = [
 
 ]
 
-print(texts[18][0][0])
