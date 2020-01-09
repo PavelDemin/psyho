@@ -40,9 +40,7 @@ def display_texts_content(id, off, block=None):
     else:
         text_list = gs.get_all_values_from_worksheet(int(block))
     logging.debug('len(text_list) = {}'.format(len(text_list)))
-    # print(len(text_list))
     if off < len(text_list) - 1:
-        print(text_list[off][1])
         if text_list[off][1] != "":  # button exists
             logging.debug('Button exists!')
             markup = types.InlineKeyboardMarkup()
@@ -134,11 +132,9 @@ def jump_bottom_keyboard_block(message):
     text = message.text
     if text in get_keyboard():
         index = get_keyboard().index(text)
-        # print(index)
         if not db.is_user_already_in_table(message.from_user.id):
             register_user(message)
         completed = db.get_user(message.from_user.id)[4]
-        print(completed, index)
         logging.debug("Run jump_bottom_keyboard_block")
         if completed >= index:
             display_texts_content(message.chat.id, 0, index)
@@ -218,7 +214,6 @@ def str_default(s):
 def display_user_list(chat_id, markup):
     a = "Список пользователей:\n"
     users = db.get_all_users()
-    print(users)
     counter = 1
     for user in users:
         a += str(counter) + ".  <b>ID</b> = " + str(user[0]) \
