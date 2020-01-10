@@ -65,14 +65,18 @@ def display_texts_content(id, off, block=None):
                         break
             else:
                 with requests.session() as s:
-                    file = s.get(text_list[off][0]).content
-                    bot.send_photo(id, photo=file, reply_markup=markup)
+                    request = s.get(text_list[off][0])
+                    if request.status_code == 200:
+                        file = s.get(text_list[off][0]).content
+                        bot.send_photo(id, photo=file, reply_markup=markup)
+                    else:
+                        bot.send_message(id, 'Невозможно загрузить фото')
         else:
-            m = bot.send_message(id, text_list[off][0])
+            m = bot.send_message(id, text_list[off][0], parse_mode='Markdown')
             bot.register_next_step_handler(m, lambda m: answer_for_question(m, str(off + 1), str(block),
                                                                             text_list[off][0]))
     elif off == len(text_list) - 1:
-        m = bot.send_message(id, text_list[off][0])
+        m = bot.send_message(id, text_list[off][0], parse_mode='Markdown')
         bot.register_next_step_handler(m, lambda m: feedback_at_end_of_block(m, block))
 
 
@@ -193,8 +197,8 @@ def answer_for_question(message, off, block, text):
 
 
 def send_message_to_admin(message, text, admin_id=config.admin):
-    msg = f'Сообщение от @{message.from_user.username} на вопрос <b>{text}</b>:\n\n'
-    bot.send_message(admin_id, text=msg + message.text, parse_mode='HTML')
+    msg = f'Сообщение от @{message.from_user.username} на вопрос *{text}*:\n\n'
+    bot.send_message(admin_id, text=msg + message.text, parse_mode='Markdown')
 
 
 def send_message_all_users(message):
