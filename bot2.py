@@ -58,7 +58,7 @@ def display_texts_content(id, off, block=None):
                         if len(s) < 4096:
                             bot.send_message(id, s, reply_markup=markup, parse_mode='Markdown',
                                              disable_web_page_preview=True)
-                        break
+                            break
                     else:
                         bot.send_message(id, text_list[off][0], reply_markup=markup, parse_mode='Markdown',
                                          disable_web_page_preview=True)
