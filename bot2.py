@@ -14,7 +14,7 @@ token = config.token  # this
 admin_password = 'QAZwsx123321'
 # ----------------------------------------------------------------------
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 bot = telebot.TeleBot(token)
 db = botSql.bot_sql()
 gs = gsheets()
@@ -49,8 +49,8 @@ def display_texts_content(id, off, block=None):
             regex = r"(jpg|png|gif|bmp|jpeg)"
             if re.search(regex, text_list[off][0]) is None:
                 s = text_list[off][0]
-                while s:
-                    if len(s) > 4096:
+                if len(s) > 4096:
+                    while s:
                         tmp = s[:s.rfind('.', 0, 4096) + 1]
                         bot.send_message(id, tmp, parse_mode='Markdown',
                                          disable_web_page_preview=True)
@@ -59,10 +59,9 @@ def display_texts_content(id, off, block=None):
                             bot.send_message(id, s, reply_markup=markup, parse_mode='Markdown',
                                              disable_web_page_preview=True)
                             break
-                    else:
-                        bot.send_message(id, text_list[off][0], reply_markup=markup, parse_mode='Markdown',
-                                         disable_web_page_preview=True)
-                        break
+                else:
+                    bot.send_message(id, text_list[off][0], reply_markup=markup, parse_mode='Markdown',
+                                     disable_web_page_preview=True)
             else:
                 with requests.session() as s:
                     request = s.get(text_list[off][0])
