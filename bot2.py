@@ -48,8 +48,21 @@ def display_texts_content(id, off, block=None):
                 types.InlineKeyboardButton(text=text_list[off][1], callback_data=str(block) + ',' + str(off + 1)))
             regex = r"(?:(http|https):\/\/)(.<b>?)\/(.+?)(?:\/|\?|\#|$|\n)\w<b>.(jpg|png|gif|bmp|jpeg)"
             if re.search(regex, text_list[off][0]) is None:
-                bot.send_message(id, text_list[off][0], reply_markup=markup, parse_mode='Markdown',
-                                 disable_web_page_preview=True)
+                s = text_list[off][0]
+                while s:
+                    if len(s) > 4096:
+                        tmp = s[:s.rfind('.', 0, 4096) + 1]
+                        bot.send_message(id, tmp, parse_mode='Markdown',
+                                         disable_web_page_preview=True)
+                        s = s[s.rfind('.', 0, 4096) + 1:]
+                        if len(s) < 4096:
+                            bot.send_message(id, s, reply_markup=markup, parse_mode='Markdown',
+                                             disable_web_page_preview=True)
+                        break
+                    else:
+                        bot.send_message(id, text_list[off][0], reply_markup=markup, parse_mode='Markdown',
+                                         disable_web_page_preview=True)
+                        break
             else:
                 with requests.session() as s:
                     file = s.get(text_list[off][0]).content
