@@ -46,7 +46,7 @@ def display_texts_content(id, off, block=None):
             markup = types.InlineKeyboardMarkup()
             markup.add(
                 types.InlineKeyboardButton(text=text_list[off][1], callback_data=str(block) + ',' + str(off + 1)))
-            regex = r"(?:(http|https):\/\/)(.<b>?)\/(.+?)(?:\/|\?|\#|$|\n)\w<b>.(jpg|png|gif|bmp|jpeg)"
+            regex = r"(jpg|png|gif|bmp|jpeg)"
             if re.search(regex, text_list[off][0]) is None:
                 s = text_list[off][0]
                 while s:
