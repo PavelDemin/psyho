@@ -131,6 +131,7 @@ def inline_button_pressed_handler(message):
         return
     if not db.is_user_already_in_table(message.from_user.id):
         register_user(message)
+    bot.send_chat_action(chat_id, 'typing')
     display_texts_content(chat_id, int(message.data.split(',')[1]), int(message.data.split(',')[0]))
 
 
@@ -197,7 +198,7 @@ def answer_for_question(message, off, block, text):
 
 
 def send_message_to_admin(message, text, admin_id=config.admin):
-    msg = f'Сообщение от @{message.from_user.username} на вопрос *{text}*:\n\n'
+    msg = f'Сообщение от ID:{message.from_user.id} на вопрос *{text}*:\n\n'
     bot.send_message(admin_id, text=msg + message.text, parse_mode='Markdown')
 
 
@@ -295,7 +296,8 @@ def access_handler(message):
         display_bottom_keyboard(message.chat.id)
         display_texts_content(message.chat.id, 0, 0)
     else:
-        bot.send_message(chat_id, "Пароль не найден либо уже активирован!")
+        bot.send_message(chat_id, "Пароль не найден либо уже активирован! Попробуйте еще раз")
+        start_message(message)
 
 
 bot.polling(none_stop=True)
