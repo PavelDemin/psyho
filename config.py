@@ -1,4 +1,4 @@
-token = '1003665340:AAGACF_p8Gt6j7gkZXhjebruIZKYbP5nJak'
+token = '1049324914:AAGIXLviEG4VxoSETiYELiAvoA6Mp3OHrVo'
 CLIENT_SECRET = 'sheetsDev-aeb8d4e0363b.json'
 SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
 spreadsheet_name = 'psyho'
