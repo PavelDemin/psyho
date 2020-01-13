@@ -14,7 +14,7 @@ token = config.token  # this
 admin_password = 'QAZwsx123321'
 # ----------------------------------------------------------------------
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 bot = telebot.TeleBot(token)
 db = botSql.bot_sql()
 gs = gsheets()
