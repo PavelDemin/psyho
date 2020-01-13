@@ -295,8 +295,7 @@ def access_handler(message):
         display_bottom_keyboard(message.chat.id)
         display_texts_content(message.chat.id, 0, 0)
     else:
-        bot.send_message(chat_id, "Пароль не найден либо уже активирован! Попробуйте еще раз")
-        start_message(message)
+        bot.send_message(chat_id, "Пароль не найден либо уже активирован! Попробуйте еще раз /start")
 
 
 bot.polling(none_stop=True)
