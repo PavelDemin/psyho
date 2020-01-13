@@ -7,10 +7,14 @@ class gsheets:
     scope = ['https://spreadsheets.google.com/feeds',
              'https://www.googleapis.com/auth/drive']
 
+    def __init__(self):
+        self.credentials = ServiceAccountCredentials.from_json_keyfile_name(config.CLIENT_SECRET, self.scope)
+        self.gc = gspread.authorize(self.credentials)
+
     def auth(self):
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(config.CLIENT_SECRET, self.scope)
-        gc = gspread.authorize(credentials)
-        sh = gc.open(config.spreadsheet_name)
+        if self.credentials.access_token_expired:
+            self.gc = gspread.authorize(self.credentials)
+        sh = self.gc.open(config.spreadsheet_name)
         return sh
 
     def read_sheet(self, number_sheet: int):
